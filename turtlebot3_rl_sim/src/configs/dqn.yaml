@@ -1,0 +1,8 @@
+turtlebot3:
+    alpha: 0.00025
+    gamma: 0.99
+    epsilon: 0.0 #1.0
+    epsilon_discount: 0.995
+    nepisodes: 1500
+    nsteps: 250
+    stage_name: "stage_1_more_laserscan"

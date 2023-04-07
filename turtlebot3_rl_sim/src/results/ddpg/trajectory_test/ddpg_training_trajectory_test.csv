@@ -1,0 +1,2 @@
+episode_number,success_episode,failure_episode,episode_reward,episode_step,ego_safety_score,social_safety_score,timelapse
+1501,True,False,346,113

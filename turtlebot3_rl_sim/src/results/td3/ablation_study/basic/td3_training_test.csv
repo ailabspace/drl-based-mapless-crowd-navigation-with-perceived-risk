@@ -1,0 +1,8 @@
+episode_number,success_episode,failure_episode,episode_reward,episode_step
+401,True,False,-136,297
+402,False,True,-305,86
+401,True,False,-169,317
+401,True,False,-224,346
+402,True,False,-1912,1457
+403,True,False,-2122,1802
+401,True,False,-1552,1301

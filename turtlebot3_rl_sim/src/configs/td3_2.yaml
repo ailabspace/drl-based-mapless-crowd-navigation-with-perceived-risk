@@ -1,0 +1,8 @@
+turtlebot3:
+    actor_alpha: 0.0003 #0.0003
+    critic_alpha: 0.0003
+    gamma: 0.99
+    tau: 0.005 #0.005 #0.01
+    nepisodes: 1510
+    nsteps: 1000
+    stage_name: "trajectory_test"

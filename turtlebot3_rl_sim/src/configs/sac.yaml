@@ -1,0 +1,9 @@
+turtlebot3:
+    actor_alpha: 0.0003 #0.001
+    critic_v_alpha: 0.0003
+    critic_soft_q_alpha: 0.0003
+    gamma: 0.99
+    tau: 5.e-3 #0.01 #0.001
+    nepisodes: 2000
+    nsteps: 1000
+    stage_name: "stage_1_more_laserscan"

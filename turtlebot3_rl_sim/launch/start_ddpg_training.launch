@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <arg name="stage" default="1"/>
+    <param name="stage_number"  value="$(arg stage)"/>
+    <!-- Load configuration file -->
+    <rosparam file="/home/zero/catkin_ws/src/turtlebot3_rl_sim/src/configs/ddpg.yaml" />
+    <rosparam file="/home/zero/catkin_ws/src/turtlebot3_rl_sim/src/configs/turtlebot3_world.yaml" />
+    <!-- Launch the training system -->
+    <node pkg="turtlebot3_rl_sim" name="turtlebot3_ddpg" type="start_ddpg_training.py" output="screen"/>
+</launch>

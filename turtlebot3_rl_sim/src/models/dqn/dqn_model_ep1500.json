@@ -1,0 +1,1 @@
+{"current_epoch": 1500, "nsteps": 250, "network_inputs": 361, "network_outputs": 3, "memorySize": 1000000, "nepisodes": 1500, "network_structure": [300, 300], "discountFactor": 0.99, "learningRate": 0.00025, "learnStart": 64, "explorationRate": 0.049911691230058335, "updateTargetNetwork": 10000, "minibatch_size": 64}

@@ -1,0 +1,20 @@
+<launch>
+    <arg name="model" default="burger" doc="model type [burger, waffle]"/>
+    <arg name="x" default="1.0" /> <!-- -2.0 for default t3 map, -1.0 for stage 1 to 3 map, -0.7 for stage 4, custom stage map: -0.7-->
+    <arg name="y" default="1.0" />
+    <arg name="z" default="0.0" />
+    <arg name="roll" default="0.0"/>
+    <arg name="pitch" default="0.0"/>
+    <arg name="yaw" default="3.14"/>
+
+
+    <param name="robot_description" command="$(find xacro)/xacro.py $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model turtlebot3_burger -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -param robot_description" />
+
+    <!--<node name="robot_state_publisher_turtlebot3" pkg="robot_state_publisher" type="robot_state_publisher"
+        respawn="false" output="screen">
+        <param name="publish_frequency" type="double" value="5.0" />
+    </node>-->
+
+</launch>

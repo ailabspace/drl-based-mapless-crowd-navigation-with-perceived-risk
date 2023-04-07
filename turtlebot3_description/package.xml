@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package>
+  <name>turtlebot3_description</name>
+  <version>0.1.6</version>
+  <description>
+    3D model of the TurtleBot3 for simulation and visualization
+  </description>
+  <license>Apache License 2.0</license>
+  <author email="pyo@robotis.com">Pyo</author>
+  <author email="thlim@robotis.com">Darby Lim</author>
+  <maintainer email="pyo@robotis.com">Pyo</maintainer>
+  <url type="bugtracker">https://github.com/ROBOTIS-GIT/turtlebot3/issues</url>
+  <url type="repository">https://github.com/ROBOTIS-GIT/turtlebot3</url>
+  <url type="website">http://turtlebot3.robotis.com</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>urdf</build_depend>
+  <build_depend>xacro</build_depend>
+  <run_depend>urdf</run_depend>
+  <run_depend>xacro</run_depend>
+</package>

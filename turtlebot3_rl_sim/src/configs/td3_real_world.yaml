@@ -1,0 +1,8 @@
+turtlebot3:
+    actor_alpha: 0.0003 #0.0003
+    critic_alpha: 0.0003
+    gamma: 0.99
+    tau: 0.005 #0.01
+    nepisodes: 3020
+    nsteps: 1000
+    stage_name: "revamped/new_tracking_cp_gcp_nobonus_corrected_3" #"stage_1_improve_more_buffer_add_sn"
