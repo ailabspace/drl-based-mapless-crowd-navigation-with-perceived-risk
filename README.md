@@ -1,6 +1,7 @@
 # Deep Reinforcement Learning Based Crowd Navigation with Perceived Risk of the Moving Crowd for Mobile Robots
 
-This repository contains codes to replicate the research work titled "**Deep Reinforcement Learning-Based Mapless Crowd Navigation with Perceived Risk of the Moving Crowd for Mobile Robots**". In addition, it also provides a framework to train and test six different algorithms which are TD3, DDPG, SAC, Q-Learning, SARSA, and DQN. Turtlebot3 Burger mobile robot platform was used to train and test these algorithms.
+Source code for research work on adding Risk Perception to TD3 for Crowd Navigation. It also provides a framework to train and test six different algorithms which are TD3, DDPG, SAC, Q-Learning, SARSA, and DQN.
+
 
 [![Watch the video](https://img.youtube.com/vi/djD9mfPQRgc/maxresdefault.jpg)](https://youtu.be/djD9mfPQRgc)
 
@@ -89,14 +90,7 @@ If you have found this repository useful or have used this repository in any of 
 If you have used this repository in any of your scientific work, please consider citing the work:
 
 ```
-@inproceedings{anas2022comparison,
-  title={Comparison of Deep Q-Learning, Q-Learning and SARSA Reinforced Learning for Robot Local Navigation},
-  author={Anas, Hafiq and Ong, Wee Hong and Malik, Owais Ahmed},
-  booktitle={International Conference on Robot Intelligence Technology and Applications},
-  pages={443--454},
-  year={2022},
-  organization={Springer}
-}
+TODO
 ```
 
 ## Acknowledgments
