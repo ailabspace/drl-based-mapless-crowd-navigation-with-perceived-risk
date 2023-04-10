@@ -87,10 +87,17 @@ If you have found this repository useful or have used this repository in any of 
 
 ## BibTeX Citation
 
-If you have used this repository in any of your scientific work, please consider citing the work:
+If you have used this repository in any of your scientific work, please consider citing the work (Submitted to IROS2023):
 
 ```
-TODO
+@misc{anas2023deep,
+      title={Deep Reinforcement Learning-Based Mapless Crowd Navigation with Perceived Risk of the Moving Crowd for Mobile Robots}, 
+      author={Hafiq Anas and Ong Wee Hong and Owais Ahmed Malik},
+      year={2023},
+      eprint={2304.03593},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO}
+}
 ```
 
 ## Acknowledgments
