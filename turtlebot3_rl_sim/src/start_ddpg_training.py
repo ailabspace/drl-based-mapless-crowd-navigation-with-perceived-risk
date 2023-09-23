@@ -10,8 +10,9 @@ import numpy as np
 import rospkg
 import utils
 import time
-# from environment_stage_1_nobonus import Env < -- used in latest work
-from environment_stage_1_original import Env  # For thesis
+from environment_stage_1_nobonus import Env  # <-- used in latest work
+
+# from environment_stage_1_original import Env  # For thesis
 
 if __name__ == '__main__':
     rospy.init_node('ddpg_training', anonymous=True, log_level=rospy.WARN)

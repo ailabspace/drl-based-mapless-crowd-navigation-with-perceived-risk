@@ -16,13 +16,13 @@
 #################################################################################
 
 # Authors: Gilbert #
+# Added: Risk Perception of the Moving Crowd (by Hafiq Anas) #
 
-import utils
 import rospy
 import numpy as np
 import math
 import time
-
+from math import pi
 from geometry_msgs.msg import Twist, Pose
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
@@ -30,9 +30,13 @@ from std_srvs.srv import Empty
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import PointStamped
+from visualization_msgs.msg import Marker
 
 from collections import deque
 from uuid import uuid4
+from itertools import chain
+import utils
+import rospy
 
 
 class Env:
@@ -48,9 +52,13 @@ class Env:
         rospy.on_shutdown(self.shutdown)
 
         # Added
+        self.k_obstacle_count = 8
+        self.obstacle_present_step_counts = 0
+        self.ego_score_collision_prob = 0.0
         self.vel_cmd = 0.0
         self.orientation = 0.0
-        self.yaw = 3.14
+        self.previous_yaw = 3.14
+        self.robot_yaw = 3.14
         self.linear_twist = 0.0
         self.angular_twist = 0.0
         self.previous_heading = 0.0
@@ -59,10 +67,21 @@ class Env:
         self.episode_failure = False
         self.social_safety_violation_count = 0
         self.ego_safety_violation_count = 0
-        self.desired_point = Point()
-        self.desired_point.x = rospy.get_param("/turtlebot3/desired_pose/x")
-        self.desired_point.y = rospy.get_param("/turtlebot3/desired_pose/y")
-        self.desired_point.z = rospy.get_param("/turtlebot3/desired_pose/z")
+        self.starting_point = Point()
+        self.starting_point.x = rospy.get_param("/turtlebot3/starting_pose/x")
+        self.starting_point.y = rospy.get_param("/turtlebot3/starting_pose/y")
+        self.starting_point.z = rospy.get_param("/turtlebot3/starting_pose/z")
+
+        self.original_desired_point = Point()
+        self.original_desired_point.x = rospy.get_param("/turtlebot3/desired_pose/x")
+        self.original_desired_point.y = rospy.get_param("/turtlebot3/desired_pose/y")
+        self.original_desired_point.z = rospy.get_param("/turtlebot3/desired_pose/z")
+
+        self.waypoint_desired_point = Point()
+        self.waypoint_desired_point.x = self.original_desired_point.x
+        self.waypoint_desired_point.y = self.original_desired_point.y
+        self.waypoint_desired_point.z = self.original_desired_point.z
+
         self.linear_forward_speed = rospy.get_param('/turtlebot3/linear_forward_speed')
         self.linear_turn_speed = rospy.get_param('/turtlebot3/linear_turn_speed')
         self.angular_speed = rospy.get_param('/turtlebot3/angular_speed')
@@ -79,6 +98,7 @@ class Env:
         self.closest_obstacle_region = None
         self.closest_obstacle_pose = None
         self.closest_obstacle_vel = None
+        self.closest_obstacle_pose_vel = None
 
         # Deque lists to compare items between time steps
         self.agent_pose_deque = deque([])
@@ -124,13 +144,28 @@ class Env:
         self.total_x_travelled = 0
         self.total_y_travelled = 0
 
-        self.pub_obs1_pose = rospy.Publisher('/obstacle_poses/1', PointStamped, queue_size=1)
-        self.pub_obs2_pose = rospy.Publisher('/obstacle_poses/2', PointStamped, queue_size=1)
-        self.pub_obs3_pose = rospy.Publisher('/obstacle_poses/3', PointStamped, queue_size=1)
-        self.pub_obs4_pose = rospy.Publisher('/obstacle_poses/4', PointStamped, queue_size=1)
-        self.pub_obs5_pose = rospy.Publisher('/obstacle_poses/5', PointStamped, queue_size=1)
-        self.pub_obs6_pose = rospy.Publisher('/obstacle_poses/6', PointStamped, queue_size=1)
-        self.pub_obs7_pose = rospy.Publisher('/obstacle_poses/7', PointStamped, queue_size=1)
+        # RVIZ visualization markers to see Collision Probabilities of obstacles w.r.t robot's motion
+        self.pub_obs1_pose_text = rospy.Publisher('/obstacle_text_poses/1', Marker, queue_size=1)
+        self.pub_obs2_pose_text = rospy.Publisher('/obstacle_text_poses/2', Marker, queue_size=1)
+        self.pub_obs3_pose_text = rospy.Publisher('/obstacle_text_poses/3', Marker, queue_size=1)
+        self.pub_obs4_pose_text = rospy.Publisher('/obstacle_text_poses/4', Marker, queue_size=1)
+        self.pub_obs5_pose_text = rospy.Publisher('/obstacle_text_poses/5', Marker, queue_size=1)
+        self.pub_obs6_pose_text = rospy.Publisher('/obstacle_text_poses/6', Marker, queue_size=1)
+        self.pub_obs7_pose_text = rospy.Publisher('/obstacle_text_poses/7', Marker, queue_size=1)
+        self.pub_obs8_pose_text = rospy.Publisher('/obstacle_text_poses/8', Marker, queue_size=1)
+        self.pub_obs9_pose_text = rospy.Publisher('/obstacle_text_poses/9', Marker, queue_size=1)
+        self.pub_obs10_pose_text = rospy.Publisher('/obstacle_text_poses/10', Marker, queue_size=1)
+
+        self.pub_obs1_pose_shape = rospy.Publisher('/obstacle_text_shape/1', Marker, queue_size=1)
+        self.pub_obs2_pose_shape = rospy.Publisher('/obstacle_text_shape/2', Marker, queue_size=1)
+        self.pub_obs3_pose_shape = rospy.Publisher('/obstacle_text_shape/3', Marker, queue_size=1)
+        self.pub_obs4_pose_shape = rospy.Publisher('/obstacle_text_shape/4', Marker, queue_size=1)
+        self.pub_obs5_pose_shape = rospy.Publisher('/obstacle_text_shape/5', Marker, queue_size=1)
+        self.pub_obs6_pose_shape = rospy.Publisher('/obstacle_text_shape/6', Marker, queue_size=1)
+        self.pub_obs7_pose_shape = rospy.Publisher('/obstacle_text_shape/7', Marker, queue_size=1)
+        self.pub_obs8_pose_shape = rospy.Publisher('/obstacle_text_shape/8', Marker, queue_size=1)
+        self.pub_obs9_pose_shape = rospy.Publisher('/obstacle_text_shape/9', Marker, queue_size=1)
+        self.pub_obs10_pose_shape = rospy.Publisher('/obstacle_text_shape/10', Marker, queue_size=1)
 
     def shutdown(self):
         rospy.loginfo("Stopping TurtleBot")
@@ -163,7 +198,13 @@ class Env:
 
     def get_distance_to_goal(self, current_position):
         distance = self.get_distance_from_point(current_position,
-                                                self.desired_point)
+                                                self.waypoint_desired_point)
+
+        return distance
+
+    def get_actual_distance_to_goal(self, current_position):
+        distance = self.get_distance_from_point(current_position,
+                                                self.original_desired_point)
 
         return distance
 
@@ -178,7 +219,22 @@ class Env:
 
         return yaw
 
-    import math
+    def get_heading_to_goal(self, current_position, current_orientation):
+        current_pos_x = current_position.x + self.starting_point.x
+        current_pos_y = current_position.y + self.starting_point.y
+
+        yaw = self.get_angle_from_point(current_orientation)
+        goal_angle = math.atan2(self.waypoint_desired_point.y - current_pos_y,
+                                self.waypoint_desired_point.x - current_pos_x)
+
+        heading = goal_angle - yaw
+        if heading > pi:
+            heading -= 2 * pi
+
+        elif heading < -pi:
+            heading += 2 * pi
+
+        return heading
 
     def get_odometry(self, odom):
         self.position = odom.pose.pose.position
@@ -187,14 +243,34 @@ class Env:
         self.angular_twist = odom.twist.twist.angular
 
     def get_state(self, scan, step_counter=0, action=[0, 0]):
+        if step_counter == 1:
+            # Get updated waypoints according to the Point Of Intersection at circle (Robot FOV)
+            goal_waypoints = utils.get_local_goal_waypoints([self.position.x, self.position.y],
+                                                            [self.original_desired_point.x,
+                                                             self.original_desired_point.y], 0.3)
+
+            self.waypoint_desired_point.x = goal_waypoints[0]
+            self.waypoint_desired_point.y = goal_waypoints[1]
+
         distance_to_goal = round(self.get_distance_to_goal(self.position), 2)
         heading_to_goal = round(self.get_heading_to_goal(self.position, self.orientation), 2)
+        actual_distance_to_goal = round(self.get_actual_distance_to_goal(self.position), 2)
+
+        if step_counter % 5 == 0 or distance_to_goal < self.previous_distance:
+            goal_waypoints = utils.get_local_goal_waypoints([self.position.x, self.position.y],
+                                                            [self.original_desired_point.x,
+                                                             self.original_desired_point.y], 0.3)
+
+            self.waypoint_desired_point.x = goal_waypoints[0]
+            self.waypoint_desired_point.y = goal_waypoints[1]
+
         agent_vel_x = -1.0 * (self.linear_twist.x * math.cos(self.angular_twist.z))
         agent_vel_y = self.linear_twist.x * math.sin(self.angular_twist.z)
         obstacle_vel_x = 0.0
         obstacle_vel_y = 0.0
         self.closest_obstacle_pose = [self.position.x, self.position.y]
         self.closest_obstacle_vel = [0.0, 0.0]
+        self.closest_obstacle_pose_vel = [self.position.x, self.position.y, 0.0, 0.0] * self.k_obstacle_count
 
         # Get scan ranges from sensor, reverse the scans and remove the final scan because the scan reads in an
         # anti-clockwise manner and the final scan is the same as the first scan, so it is omitted
@@ -212,7 +288,6 @@ class Env:
             self.ground_truth_poses = utils.convert_laserscan_to_coordinate(self.ground_truth_scans, self.scan_ranges,
                                                                             self.position, yaw, 360)
             self.bounding_box_size = utils.compute_average_bounding_box_size(self.ground_truth_poses)
-            # print(self.bounding_box_size)
             self.timestep_delay = time.time()
 
             # Get agent's position in a queue list. This is for collision cone implementation.
@@ -296,7 +371,6 @@ class Env:
         # given the range
         _scans_object_type = [None] * len(change_grads)
 
-        # if not all(current_scans_is_gt):
         last_type = None
         du_count = 0  # Delayed update count
         for i in range(len(filtered_front_obstacle_poses)):
@@ -479,7 +553,7 @@ class Env:
         segmented_scan_object_types_2d = []
         segmented_scan_object_poses_2d = []
 
-        # Temporary fix: remove nones from first and last index of a list
+        # # Temporary fix: remove nones from first and last index of a list
         for i in range(len(segmented_scan_object_distances)):
             if any(isinstance(item, list) for item in segmented_scan_object_distances[i]):
                 for j in range(len(segmented_scan_object_distances[i])):
@@ -560,27 +634,6 @@ class Env:
                 ___segmented_scan_object_distances.append(segmented_scan_object_distances_2d[i])
                 ___segmented_dist = []
 
-        # Get generalized laser scans (to reduce state space and improve learning)
-        # e.g [[0.6, .. ,0.6], [0.21, 0.123, 0.124], [0.231, 0.543, 0.231]]
-        # -> [0.6, .. , 0.6], [0.123, 0.123, 0.123], [0.543, 0.543, 0.543]]
-        # - turn into 1-d list and make it into observation scans
-        _new_scan = ___segmented_scan_object_distances[:]
-        gt_item_cnt = 0
-        for i in range(len(___segmented_scan_object_distances)):
-            if 0.6 in ___segmented_scan_object_distances[i]:
-                continue
-            else:
-                __scan = []
-                if len(confirmed_scan_object) != 0:
-                    for j in range(len(___segmented_scan_object_distances[i])):
-                        __scan.append(confirmed_scan_object[gt_item_cnt][2])
-                        _new_scan[i] = __scan
-
-        # Flatten new scan and use as observation space
-        new_scan = []
-        for i in range(len(_new_scan)):
-            new_scan += _new_scan[i]
-
         # Get wall scans and obstacle object scans
         wall_scans, obstacle_scans = [], []
         for i in range(len(confirmed_scan_object)):
@@ -589,12 +642,17 @@ class Env:
             if confirmed_scan_object[i][0] == "o":
                 obstacle_scans.append(confirmed_scan_object[i])
 
-        print("CONFIRMED SCAN: ", confirmed_scan_object)
-        print("OBSTACLE SCANS: ", obstacle_scans)
-        print("OBSTACLE COUNT: ", len(obstacle_scans))
-        print("WALL COUNT: ", len(wall_scans))
+        # print("CONFIRMED SCAN: ", confirmed_scan_object)
+        # print("OBSTACLE SCANS: ", obstacle_scans)
+        # print("OBSTACLE COUNT: ", len(obstacle_scans))
+        # print("WALL COUNT: ", len(wall_scans))
+        # print("WALL SCANS: ", wall_scans)
 
-        # Obstacle Tracking
+        # Check if there is obstacle: for calculating accurate ego and social score (don't count all steps but just
+        # steps where an obstacle is "seen" by the robot
+        if len(obstacle_scans) > 0:
+            self.obstacle_present_step_counts += 1
+
         iou, _iou = [], []
         checked_obj_scans = None
         tracked_obstacles_copy = self.tracked_obstacles.copy()
@@ -623,6 +681,7 @@ class Env:
 
                 _tracked_obs = list(tracked_obstacles_copy.get(tracked_obstacles_key_copy[i]))[1]
                 if len(confirmed_scan_object) == 0:
+                    # Remove all "tracked" obstacle from tracking list
                     self.tracked_obstacles.pop(tracked_obstacles_key_copy[i - 1])
                     self.tracked_obstacles_keys.remove(tracked_obstacles_key_copy[i])
                 else:
@@ -634,6 +693,8 @@ class Env:
                 checked_obj_scans = [False] * len(iou[0])
 
         iou_copy = iou[:]
+        iou2, _iou2 = [], []
+        reupdate_tracking = False
 
         for i in range(len(iou_copy)):
             if iou_copy[i]:
@@ -665,6 +726,7 @@ class Env:
                     pass
                 else:  # False or None
                     if confirmed_scan_object[i][0] == 'o':
+                        # print("NEW OBSTACLE")
                         unique_id = uuid4()
                         # Get tracked obstacles in the following format [<object type>, <coord list>, <deque coord
                         # list>]
@@ -702,12 +764,22 @@ class Env:
 
         # Time to Collision computation with collision cone
         collision_prob = []
+        ego_score_collision_prob = []
+        _ego_score_collision_prob = 0.0
         if len(self.agent_pose_deque) == 2:
             agent_vel = utils.get_timestep_velocity(self.agent_pose_deque, self.agent_vel_timestep)
 
             # Get agent velocity in x and y from Twist message
             agent_vel_x = -1 * self.linear_twist.x * (math.cos(self.angular_twist.z))
             agent_vel_y = self.linear_twist.x * (math.sin(self.angular_twist.z))
+
+            agent_disp_x = agent_vel_x * self.agent_vel_timestep
+            agent_disp_y = agent_vel_y * self.agent_vel_timestep
+
+            agent_vel2 = self.linear_twist.x
+
+            # self.agent_pose_deque[1][0] = self.agent_pose_deque[0][0] + agent_disp_x
+            # self.agent_pose_deque[1][1] = self.agent_pose_deque[0][1] + agent_disp_y
 
             goal_vel = 0.0
             obstacle_vel = []
@@ -748,59 +820,155 @@ class Env:
                     [self.agent_pose_deque[0], [vo_agent_pose_x, vo_agent_pose_y]],
                     self.tracked_obstacles[
                         tracked_obstacles_key_copy[i]][1],
-                    self.min_scan_range)  # 0.0505 is the radius of obstacles
+                    0.178)  # Turtlebot3 Burger Robot width
 
                 resultant_vel = agent_vel - obstacle_vel
 
                 if distance_to_collision_point is not None:
                     if resultant_vel == 0:
                         time_to_collision = 0
-                        _collision_prob = 0.0 * (
+                        _collision_prob = 1.0 * (
                             utils.compute_general_collision_prob(  # original: 1.0 (before ablation)
                                 self.tracked_obstacles[tracked_obstacles_key_copy[i]][2], self.max_scan_range,
                                 self.min_scan_range))
                     else:
                         time_to_collision = distance_to_collision_point / resultant_vel
-                        # print("DTCP: ", distance_to_collision_point)
-                        # print("RV: ", resultant_vel)
-                        # print("TTC: ", time_to_collision)
-                        if time_to_collision != 0:  # added to remove floating by zero error during division
-                            _collision_prob = 0.5 * (utils.compute_collision_prob(time_to_collision)) + 0.5 * (
-                                utils.compute_general_collision_prob(
-                                    self.tracked_obstacles[tracked_obstacles_key_copy[i]][2], self.max_scan_range,
-                                    self.min_scan_range))
-                        else:
-                            _collision_prob = (0.5 * 0) + 0.5 * (
-                                utils.compute_general_collision_prob(
-                                    self.tracked_obstacles[tracked_obstacles_key_copy[i]][2], self.max_scan_range,
-                                    self.min_scan_range))
-                    collision_prob.append(_collision_prob)
+                        # if time_to_collision != 0:  # added to remove floating by zero error during division
+                        _ego_score_collision_prob = utils.compute_collision_prob(time_to_collision)
+                        _collision_prob = 0.5 * (utils.compute_collision_prob(time_to_collision)) + 0.5 * (
+                            # original: 0.5, 0.5 (before ablation)
+                            utils.compute_general_collision_prob(
+                                self.tracked_obstacles[tracked_obstacles_key_copy[i]][2], self.max_scan_range,
+                                self.min_scan_range))
+                    collision_prob.append([_collision_prob] + self.tracked_obstacles[tracked_obstacles_key_copy[i]][1] \
+                                          + self.tracked_obstacles[tracked_obstacles_key_copy[i]][6])
+                    ego_score_collision_prob.append(_ego_score_collision_prob)
                     # Append collision probability to dictionary
                     # self.tracked_obstacles[tracked_obstacles_key_copy[i]][6] = _collision_prob
                 else:
                     time_to_collision = None
+                    _ego_score_collision_prob = utils.compute_collision_prob(time_to_collision)
                     _collision_prob = 0.5 * (utils.compute_collision_prob(time_to_collision)) + 0.5 * (
+                        # original: 0.5, 0.5 (before ablation)
                         utils.compute_general_collision_prob(
                             self.tracked_obstacles[tracked_obstacles_key_copy[i]][2], self.max_scan_range,
                             self.min_scan_range))
-                    collision_prob.append(_collision_prob)
+                    collision_prob.append([_collision_prob] + self.tracked_obstacles[tracked_obstacles_key_copy[i]][1] \
+                                          + self.tracked_obstacles[tracked_obstacles_key_copy[i]][6])
+                    ego_score_collision_prob.append(_ego_score_collision_prob)
                     # Append collision probability to dictionary
                     # self.tracked_obstacles[tracked_obstacles_key_copy[i]][6] = _collision_prob
 
             if len(collision_prob) == 0:
                 self.collision_prob = 0.0
-                self.closest_obstacle_pose = [self.position.x, self.position.y]
-                self.closest_obstacle_vel = [0.0, 0.0]
-            else:
-                val, idx = max((val, idx) for (idx, val) in enumerate(collision_prob))
-                _max_cp_closest_obs = self.tracked_obstacles[tracked_obstacles_key_copy[idx]]
-                self.collision_prob = max(0.0, max(collision_prob))
-                self.closest_obstacle_pose = _max_cp_closest_obs[1]
-                self.closest_obstacle_vel = _max_cp_closest_obs[6]
+                self.ego_score_collision_prob = 0.0
 
-            # Get DTGP and compute goal reaching collision probability
-            distance_to_goal_point = utils.get_collision_point(self.agent_pose_deque, [self.desired_point.x,
-                                                                                       self.desired_point.y], 0.2)
+                top_k_obstacles_pose_vel = []
+                top_k_obstacle_collision_prob = []
+                for i in range(self.k_obstacle_count):
+                    top_k_obstacles_pose_vel.append([self.position.x, self.position.y, 0, 0])
+
+                # Flatten
+                flattened_top_k_obstacles_pose_vel = []
+                for i in range(len(top_k_obstacles_pose_vel)):
+                    flattened_top_k_obstacles_pose_vel += top_k_obstacles_pose_vel[i]
+
+                self.closest_obstacle_pose_vel = flattened_top_k_obstacles_pose_vel
+
+            else:
+                self.ego_score_collision_prob = max(ego_score_collision_prob)
+
+                # Find top K obstacles with highest CP, sort according to first elem of sublist
+                _top_k_collision_prob = sorted(collision_prob, key=lambda x: x[0], reverse=True)
+                top_k_collision_prob = _top_k_collision_prob[-self.k_obstacle_count:]
+
+                self.collision_prob = top_k_collision_prob[0][0]
+
+                # Get pose (x, y) and vels (Vx, Vy) of top K obstacles
+                top_k_obstacles_pose_vel = []
+                top_k_obstacle_collision_prob = []
+                for i in range(len(top_k_collision_prob)):
+                    top_k_obstacles_pose_vel.append(top_k_collision_prob[i][1:])  # remove CP
+                    top_k_obstacle_collision_prob.append(top_k_collision_prob[i][0])
+
+                # Check if tracked obstacle is less than K, use placeholder values if it is
+                if len(top_k_obstacles_pose_vel) < (self.k_obstacle_count * 4):
+                    diff = self.k_obstacle_count - len(top_k_obstacles_pose_vel)
+                    for i in range(diff):
+                        top_k_obstacles_pose_vel.append([self.position.x, self.position.y, 0, 0])
+
+                # Flatten
+                flattened_top_k_obstacles_pose_vel = []
+                for i in range(len(top_k_obstacles_pose_vel)):
+                    flattened_top_k_obstacles_pose_vel += top_k_obstacles_pose_vel[i]
+
+                self.closest_obstacle_pose_vel = flattened_top_k_obstacles_pose_vel
+                # self.closest_obstacle_pose = _max_cp_closest_obs[1]
+                # self.closest_obstacle_vel = _max_cp_closest_obs[6]
+
+            # Visualize dynamic obstacles on RVIZ (For video demo/debugging) (for K = 8)
+            _obstacle_pose_text = [Marker(), Marker(), Marker(), Marker(), Marker(),
+                                   Marker(), Marker(), Marker(), Marker(), Marker()]
+            _obstacle_pose_shape = [Marker(), Marker(), Marker(), Marker(), Marker(),
+                                    Marker(), Marker(), Marker(), Marker(), Marker()]
+            _obstacle_pose_state = [False, False, False, False, False, False, False, False, False, False]
+            _robot_pose = [self.position.x, self.position.y, self.robot_yaw]
+            _yaw_change = self.robot_yaw - self.previous_yaw
+
+            # Obstacle RVIZ positions
+            for i in range(len(top_k_obstacles_pose_vel)):
+                try:  # Handle index out of range error
+                    _obstacle_pose_text[i] = utils.create_rviz_visualization_text_marker(_obstacle_pose_text[i],
+                                                                                         _robot_pose,
+                                                                                         top_k_obstacles_pose_vel[i],
+                                                                                         top_k_obstacle_collision_prob[
+                                                                                             i])
+                    _obstacle_pose_shape[i] = utils.create_rviz_visualization_shape_marker(_obstacle_pose_shape[i],
+                                                                                           _robot_pose,
+                                                                                           top_k_obstacles_pose_vel[i],
+                                                                                           top_k_obstacle_collision_prob[
+                                                                                               i])
+                    if _obstacle_pose_text[i].pose.position.x != 0.0 and _obstacle_pose_text[i].pose.position.y != 0.0:
+                        _obstacle_pose_state[i] = True
+                except IndexError:
+                    # print("Index out of range for rviz tracked obstacle publisher")
+                    pass
+                continue
+
+            # Goal position marker
+            _goal_pose_marker_obj = Marker()
+            _goal_pose_marker = utils.create_rviz_visualization_shape_marker(_goal_pose_marker_obj, _robot_pose,
+                                                                             [0, 0], 0.0, mtype="robot")
+
+            # Waypoint position marker
+            _waypoint_pose_marker_obj = Marker()
+            _waypoint_pose_marker = utils.create_rviz_visualization_shape_marker(_waypoint_pose_marker_obj, _robot_pose,
+                                                                                 [0, 0], 0.0, mtype="robot",
+                                                                                 goal_pose=[
+                                                                                     self.waypoint_desired_point.x,
+                                                                                     self.waypoint_desired_point.y])
+
+            text_publishers = [self.pub_obs1_pose_text, self.pub_obs2_pose_text, self.pub_obs3_pose_text,
+                               self.pub_obs4_pose_text,
+                               self.pub_obs5_pose_text, self.pub_obs6_pose_text, self.pub_obs7_pose_text,
+                               self.pub_obs8_pose_text,
+                               self.pub_obs9_pose_text, self.pub_obs10_pose_text]
+            shape_publishers = [self.pub_obs1_pose_shape, self.pub_obs2_pose_shape, self.pub_obs3_pose_shape,
+                                self.pub_obs4_pose_shape,
+                                self.pub_obs5_pose_shape, self.pub_obs6_pose_shape, self.pub_obs7_pose_shape,
+                                self.pub_obs8_pose_shape,
+                                self.pub_obs9_pose_shape, self.pub_obs10_pose_shape]
+            for i in range(len(_obstacle_pose_state)):
+                text_publishers[i].publish(_obstacle_pose_text[i])
+                shape_publishers[i].publish(_obstacle_pose_shape[i])
+                if not _obstacle_pose_state[i]:
+                    text_publishers[i].publish(_goal_pose_marker)
+                    shape_publishers[i].publish(_goal_pose_marker)
+
+            # Get DTGP and compute goal reaching collision probability (NOT USED)
+            distance_to_goal_point = utils.get_collision_point(self.agent_pose_deque, [self.original_desired_point.x,
+                                                                                       self.original_desired_point.y],
+                                                               0.2)
             resultant_goal_vel = agent_vel - goal_vel
             if distance_to_goal_point is not None:
                 if resultant_goal_vel == 0:
@@ -808,13 +976,13 @@ class Env:
                     self.goal_reaching_prob = 0.0
                 else:
                     time_to_goal = distance_to_goal_point / resultant_goal_vel
-                    self.goal_reaching_prob = 0.5 * (utils.compute_collision_prob(time_to_goal)) + 0.5 * (
+                    self.goal_reaching_prob = 1.0 * (utils.compute_collision_prob(time_to_goal)) + 0.0 * (
                         utils.compute_general_collision_prob(self.get_distance_to_goal(self.position),
                                                              self.max_scan_range,
                                                              self.min_scan_range))
             else:
                 time_to_goal = None
-                self.goal_reaching_prob = 0.5 * (utils.compute_collision_prob(time_to_goal)) + 0.5 * (
+                self.goal_reaching_prob = 1.0 * (utils.compute_collision_prob(time_to_goal)) + 0.0 * (
                     utils.compute_general_collision_prob(self.get_distance_to_goal(self.position),
                                                          self.max_scan_range,
                                                          self.min_scan_range))
@@ -833,7 +1001,7 @@ class Env:
                 self.ego_safety_violation_count += 1
                 break
 
-        if self.collision_prob > 0.4:
+        if self.ego_score_collision_prob > 0.4:  # 0.4 <-- original, thesis
             self.social_safety_violation_count += 1
 
         # To compare against previous tracking list when the object recognition fails (lost tracking)
@@ -846,7 +1014,7 @@ class Env:
                 print("MINIMUM: ", str(min(current_scans)))
                 self.done = True
 
-            if self.is_in_desired_position(self.position):
+            if self.is_in_true_desired_position(self.position):
                 print("DONE: IN DESIRED POSITION")
                 self.done = True
 
@@ -855,46 +1023,37 @@ class Env:
                 self.done = True
 
         agent_position = [round(self.position.x, 3), round(self.position.y, 3)]
-        agent_orientation = [round(self.yaw, 3)]
+        agent_orientation = [round(self.robot_yaw, 3)]
         agent_velocity = [round(agent_vel_x, 3), round(agent_vel_y, 3)]
         obstacle_position = self.closest_obstacle_pose
         obstacle_velocity = self.closest_obstacle_vel
+        obstacle_position_velocity = self.closest_obstacle_pose_vel
+
+        #  no CP (ablation)
+        # obstacle_position_velocity = [self.position.x, self.position.y, 0.0, 0.0] * self.k_obstacle_count
+
         goal_heading_distance = [heading_to_goal, distance_to_goal]
-        # general_obs_distance = [round(num, 3) for num in scan_range]
-
-        # NEW scan range will change real scans into scans that belong to a wall or
-        # helps with state space to learn better
-        # general_obs_distance = None
-        # if not all(current_scans_is_gt):
-        #     print("USING SPECIAL SCANS")
-        #     if len(new_scan) != len(current_scans):
-        #         print("NOT REALLY SPECIAL SCANS")
-        #         general_obs_distance = [0.6] * 359
-        #     else:
-        #         print("REALLY USING SPECIAL SCANS")
-        #         general_obs_distance = new_scan #scan_range
-        # else:
-        #     general_obs_distance = [0.6] * 359
-
         general_obs_distance = current_scans
 
-        state = general_obs_distance + goal_heading_distance + agent_position + agent_orientation + agent_velocity + \
-                obstacle_position + obstacle_velocity
+        state = (general_obs_distance + goal_heading_distance + agent_position + agent_orientation + agent_velocity
+                 + obstacle_position_velocity)
+
+        # Round items in state to 2 decimal places
+        state = list(np.around(np.array(state), 3))
 
         return state, self.done
 
-    def compute_reward(self, state, done):
-        current_distance = state[360]  # state[-1]
-        current_heading = state[359]  # state[-2]
+    def compute_reward(self, state, step_counter, done):
+        current_heading = state[359]
+        current_distance = state[360]
 
         distance_difference = current_distance - self.previous_distance
         heading_difference = current_heading - self.previous_heading
 
-        # ADDED: step penalty
-        step_reward = -2
+        step_reward = -2  # step penalty
         htg_reward = 0
         dtg_reward = 0
-        action_reward = 0
+        waypoint_reward = 0
 
         # Action reward
         if self.last_action == "FORWARD":
@@ -946,7 +1105,26 @@ class Env:
                 self.htg_penalty_count += 1
                 htg_reward = 0
 
-        non_terminating_reward = step_reward + dtg_reward + htg_reward  # + action_reward
+        # Waypoint reward
+        if self.is_in_desired_position(self.position):
+            rospy.loginfo("Reached waypoint position!!")
+            goal_waypoints = utils.get_local_goal_waypoints([self.position.x, self.position.y],
+                                                            [self.original_desired_point.x,
+                                                             self.original_desired_point.y], 0.3)
+            self.waypoint_desired_point.x = goal_waypoints[0]
+            self.waypoint_desired_point.y = goal_waypoints[1]
+            waypoint_reward = 200
+            print("Change desired point")
+            print(self.waypoint_desired_point)
+
+            # Check if waypoint is within the goal point
+            if self.is_in_true_desired_position(self.waypoint_desired_point):
+                self.waypoint_desired_point.x = self.original_desired_point.x
+                self.waypoint_desired_point.y = self.original_desired_point.y
+                print("Change desired point to actual goal point since it is near")
+                print(self.waypoint_desired_point)
+
+        non_terminating_reward = step_reward + dtg_reward + htg_reward + waypoint_reward  # + action_reward
         self.step_reward_count += 1
 
         if self.last_action is not None:
@@ -967,7 +1145,7 @@ class Env:
             print("stop action reward count: ", str(self.stop_action_reward_count))
             print("social nav reward count: ", str(self.social_nav_reward_count))
             print("----------------------------")
-            if self.is_in_desired_position(self.position):
+            if self.is_in_true_desired_position(self.position):
                 rospy.loginfo("Reached goal position!!")
                 self.episode_failure = False
                 self.episode_success = True
@@ -1020,6 +1198,7 @@ class Env:
         # Execute the actions to move the robot for 1 timestep
         start_timestep = time.time()
         self.pub_cmd_vel.publish(vel_cmd)
+        time.sleep(0.15)
         end_timestep = time.time() - start_timestep
         if end_timestep < 0.05:
             time.sleep(0.05 - end_timestep)
@@ -1030,6 +1209,9 @@ class Env:
         self.agent_vel_timestep = end_timestep
         self.timestep_counter -= 1
 
+        # Update previous robot yaw, to check for heading changes, for RVIZ tracking visualization
+        self.previous_yaw = self.robot_yaw
+
         data = None
         while data is None:
             try:
@@ -1038,7 +1220,7 @@ class Env:
                 pass
 
         state, done = self.get_state(data, step_counter, action)
-        reward, done = self.compute_reward(state, done)
+        reward, done = self.compute_reward(state, step_counter, done)
 
         return np.asarray(state), reward, done
 
@@ -1060,6 +1242,7 @@ class Env:
         # Get initial heading and distance to goal
         self.previous_distance = self.get_distance_to_goal(self.position)
         self.previous_heading = self.get_heading_to_goal(self.position, self.orientation)
+        self.previous_yaw = 3.14
         state, _ = self.get_state(data)
 
         # Temporary (delete)
@@ -1076,6 +1259,7 @@ class Env:
         self.rotate_in_place_action_reward_count = 0
         self.social_safety_violation_count = 0
         self.ego_safety_violation_count = 0
+        self.obstacle_present_step_counts = 0
         return np.asarray(state)
 
     def get_episode_status(self):
@@ -1083,24 +1267,46 @@ class Env:
         return self.episode_success, self.episode_failure
 
     def get_social_safety_violation_status(self, step):
-
-        social_safety_score = 1.0 - ((self.social_safety_violation_count * 1.0) / step)
+        # Obstacle present step counts means the total steps where an obstacle is detected within the robot's FOV
+        # Otherwise, "step" just takes in all total number of steps regardless if it sees an obstacle or not
+        social_safety_score = 1.0 - ((self.social_safety_violation_count * 1.0) / self.obstacle_present_step_counts)
+        # social_safety_score = 1.0 - ((self.social_safety_violation_count * 1.0) / step)
 
         return social_safety_score
 
     def get_ego_safety_violation_status(self, step):
-
-        ego_safety_score = 1.0 - ((self.ego_safety_violation_count * 1.0) / step)
+        # Obstacle present step counts means the total steps where an obstacle is detected within the robot's FOV
+        # Otherwise, "step" just takes in all total number of steps regardless if it sees an obstacle or not
+        ego_safety_score = 1.0 - ((self.ego_safety_violation_count * 1.0) / self.obstacle_present_step_counts)
+        # ego_safety_score = 1.0 - ((self.ego_safety_violation_count * 1.0) / step)
 
         return ego_safety_score
 
     def is_in_desired_position(self, current_position, epsilon=0.20):  # originally 0.05, changed to 0.20
         is_in_desired_pos = False
 
-        x_pos_plus = self.desired_point.x + epsilon
-        x_pos_minus = self.desired_point.x - epsilon
-        y_pos_plus = self.desired_point.y + epsilon
-        y_pos_minus = self.desired_point.y - epsilon
+        x_pos_plus = self.waypoint_desired_point.x + epsilon
+        x_pos_minus = self.waypoint_desired_point.x - epsilon
+        y_pos_plus = self.waypoint_desired_point.y + epsilon
+        y_pos_minus = self.waypoint_desired_point.y - epsilon
+
+        x_current = current_position.x
+        y_current = current_position.y
+
+        x_pos_are_close = (x_current <= x_pos_plus) and (x_current > x_pos_minus)
+        y_pos_are_close = (y_current <= y_pos_plus) and (y_current > y_pos_minus)
+
+        is_in_desired_pos = x_pos_are_close and y_pos_are_close
+
+        return is_in_desired_pos
+
+    def is_in_true_desired_position(self, current_position, epsilon=0.20):  # originally 0.05, changed to 0.20
+        is_in_desired_pos = False
+
+        x_pos_plus = self.original_desired_point.x + epsilon
+        x_pos_minus = self.original_desired_point.x - epsilon
+        y_pos_plus = self.original_desired_point.y + epsilon
+        y_pos_minus = self.original_desired_point.y - epsilon
 
         x_current = current_position.x
         y_current = current_position.y

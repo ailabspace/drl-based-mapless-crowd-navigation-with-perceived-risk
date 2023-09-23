@@ -188,7 +188,7 @@ class Agent:
             # print(action)
 
         # Set upper and lower bound of action spaces
-        action[0, 0] = np.clip(action[0, 0], 0.22, self.max_lin_vel)
+        action[0, 0] = np.clip(action[0, 0], 0.0, self.max_lin_vel)
         action[0, 1] = np.clip(action[0, 1], -self.max_ang_vel, self.max_ang_vel)
 
         # print(action)

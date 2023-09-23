@@ -3,11 +3,16 @@ turtlebot3: #namespace
     linear_turn_speed: 0.05 # Linear speed when turning
     angular_speed: 0.3 # Angular speed when turning Left or Right
 
-    scan_ranges: 360 #73 #  Number of scans to use, e.g 37 means 36 scans because the last scan is the same as the first scan
+    scan_ranges: 360 #  Number of scans to use, e.g 37 means 36 scans because the last scan is the same as the first scan
     max_scan_range: 0.6
-    min_scan_range: 0.105 #0.105 #0.0905 #0.136
+    min_scan_range: 0.12 # Change to 0.0 for testing (to get reliable social and ego score readings)
 
     desired_pose:
-      x: -1.0 #-1.0
-      y: -1.0 #1.0 #1.0
+      x: -1.0 # Change to -2.0 for testing environment
+      y: 1.0 # Change to 2.0 for testing environment
+      z: 0.0
+
+    starting_pose:
+      x: 0.75 # Change to 1.0 for testing environment
+      y: -0.75 # Change to 0.0 for testing environment
       z: 0.0

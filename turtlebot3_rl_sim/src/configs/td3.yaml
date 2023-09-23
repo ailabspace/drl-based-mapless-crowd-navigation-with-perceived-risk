@@ -5,4 +5,4 @@ turtlebot3:
     tau: 0.005 #0.005 #0.01
     nepisodes: 3020
     nsteps: 1000
-    stage_name: "revamped/new_tracking_cp_gcp_nobonus_corrected_3_no_cpdto" #"stage_1_improve_more_buffer_add_sn"
+    stage_name: "turtlebot3_top_8_obstacle" # "revamped/new_tracking_cp_gcp_nobonus_corrected_3_no_cpdto"

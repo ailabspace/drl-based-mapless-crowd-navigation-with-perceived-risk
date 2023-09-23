@@ -1,7 +1,7 @@
 <launch>
     <arg name="model" default="burger" doc="model type [burger, waffle]"/>
     <arg name="x" default="1.0" /> <!-- -2.0 for default t3 map, -1.0 for stage 1 to 3 map, -0.7 for stage 4, custom stage map: -0.7-->
-    <arg name="y" default="1.0" />
+    <arg name="y" default="0.0" />
     <arg name="z" default="0.0" />
     <arg name="roll" default="0.0"/>
     <arg name="pitch" default="0.0"/>
@@ -16,5 +16,8 @@
         respawn="false" output="screen">
         <param name="publish_frequency" type="double" value="5.0" />
     </node>-->
+
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"/>
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen"/>
 
 </launch>

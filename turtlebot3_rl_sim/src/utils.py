@@ -5,6 +5,8 @@ import math
 import time
 import copy
 import pickle
+import rospy
+import colorsys
 from math import pi
 from collections import deque
 
@@ -12,6 +14,7 @@ from tf.transformations import euler_from_quaternion
 from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
+from visualization_msgs.msg import Marker
 
 
 def load_q(file):
@@ -31,6 +34,7 @@ def get_q(q, state, action):
     """
     return q.get((state, action), 0.0)
 
+
 # Logging methods
 def remove_logfile_if_exist(outdir, filename):
     try:
@@ -49,7 +53,8 @@ def remove_qfile_if_exist(outdir, file):
 def record_data(data, outdir, filename):
     file_exists = os.path.isfile(outdir + "/" + filename + ".csv")
     with open(outdir + "/" + filename + ".csv", "a") as fp:
-        headers = ['episode_number', 'success_episode', 'failure_episode', 'episode_reward', 'episode_step', 'ego_safety_score', 'social_safety_score', 'timelapse']
+        headers = ['episode_number', 'success_episode', 'failure_episode', 'episode_reward', 'episode_step',
+                   'ego_safety_score', 'social_safety_score', 'timelapse']
         writer = csv.DictWriter(fp, delimiter=',', lineterminator='\n', fieldnames=headers)
 
         if not file_exists:
@@ -230,6 +235,7 @@ def get_timestep_velocity(poses, timelapse):
 
     return resultant_velocity
 
+
 def get_timestep_distance(poses):
     delta_pos_x = poses[1][0] - poses[0][0]
     delta_pos_y = poses[1][1] - poses[0][1]
@@ -285,6 +291,27 @@ def get_collision_point(agent_poses, obstacle_poses, obstacle_pose_radius):
             dist_to_cp = None
 
     return dist_to_cp
+
+
+def get_local_goal_waypoints(agent_pose, goal_pose, boundary_radius, epsilon=0.0):
+    # Implementation is based on getting the point of intersection between a line from the agent's position
+    # to the goal position where the circle region is from the agent position with a radius according to the max
+    # laser scan distance
+    # If no intersection is found, then use the original goal point as the next waypoint
+    p = Point(agent_pose[0], agent_pose[1])
+    c = p.buffer(boundary_radius).boundary
+    l = LineString([(agent_pose[0], agent_pose[1]), (goal_pose[0], goal_pose[1])])
+    i = c.intersection(l)
+
+    if str(i) != 'LINESTRING EMPTY':
+        try:
+            goal_waypoints = [i.x, i.y]
+        except Exception:
+            goal_waypoints = [-(goal_pose[0] + epsilon), goal_pose[1] + epsilon]
+    else:
+        goal_waypoints = [-(goal_pose[0] + epsilon), goal_pose[1] + epsilon]
+
+    return goal_waypoints
 
 
 def compute_collision_prob(time_to_collision):
@@ -432,6 +459,7 @@ def get_iou(scan1, scan2, bounding_box_size):
 
     return iou
 
+
 def check_list(sample_list, index_to_check):
     try:
         new_list = copy.deepcopy(sample_list)
@@ -439,3 +467,128 @@ def check_list(sample_list, index_to_check):
         return True
     except:
         return False
+
+
+def create_rviz_visualization_text_marker(marker, robot_pose, obs_pose, cp, mtype="obstacle"):
+    # Pose accepts [x, y] and cp accepts floats
+    # CP float number is normalized to a range of RGB, where
+    # red is the highest CP while green is the least
+    marker.header.frame_id = "/base_footprint"
+    marker.header.stamp = rospy.Time.now()
+
+    # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
+    if mtype is "obstacle":
+        marker.type = 9
+        marker.id = 0
+
+        # Set the scale of the marker
+        marker.scale.x = 0.101
+        marker.scale.y = 0.101
+        marker.scale.z = 0.15
+
+        # Set the color, from HSL to RGB
+        if cp is None:
+            cp = 0.0
+        # print("CP: ", cp)
+        h_value = 100 - (cp * 100)
+        s_value = 1.0
+        l_value = 1.0
+        rgb_values = colorsys.hsv_to_rgb(h_value, s_value, l_value)
+        # print(rgb_values)
+        marker.color.r = 1.0  # rgb_values[0]
+        marker.color.g = 1.0  # rgb_values[1]
+        marker.color.b = 1.0  # 0.0
+        marker.color.a = 1.0
+
+        # Set the pose of the marker
+        marker.pose.position.x = -obs_pose[0] + robot_pose[0] + 0.1
+        marker.pose.position.y = -obs_pose[1] + robot_pose[1]
+        marker.pose.position.z = 0.3
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+
+        # marker text
+        marker.text = str(round(cp * 100, 1)) + "%"
+
+    return marker
+
+
+def create_rviz_visualization_shape_marker(marker, robot_pose, obs_pose, cp, mtype="obstacle", goal_pose=None):
+    # Pose accepts [x, y] and cp accepts floats
+    # CP float number is normalized to a range of RGB, where
+    # red is the highest CP while green is the least
+    if goal_pose is None:
+        goal_pose = [2, 2]
+    marker.header.frame_id = "/base_footprint"
+    marker.header.stamp = rospy.Time.now()
+
+    # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
+    if mtype is "obstacle":
+        marker.type = 3
+        marker.id = 0
+
+        # Set the scale of the marker
+        marker.scale.x = 0.055
+        marker.scale.y = 0.055
+        marker.scale.z = 0.2
+
+        # Set the color, from HSL to RGB
+        if cp is None:
+            cp = 0.0
+        # print("CP: ", cp)
+        h_value = 100 - (cp * 100)
+        s_value = 1.0
+        l_value = 1.0
+        rgb_values = colorsys.hsv_to_rgb(h_value, s_value, l_value)
+        # print(rgb_values)
+
+        marker.color.r = 0.0  # rgb_values[0]
+        marker.color.g = 1.0  # rgb_values[1]
+        marker.color.b = 0.0  # 0.0
+        marker.color.a = 1.0
+
+        # Set the pose of the marker
+        marker.pose.position.x = -obs_pose[0] + robot_pose[0]
+        marker.pose.position.y = -obs_pose[1] + robot_pose[1]
+        marker.pose.position.z = 0.1
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+
+    else:
+        if goal_pose == [2, 2]:
+            marker.type = 1
+        else:
+            marker.type = 2
+        marker.id = 0
+
+        # Set the scale of the marker
+        marker.scale.x = 0.2
+        marker.scale.y = 0.2
+        marker.scale.z = 0.05
+
+        # Set the color, from HSL to RGB
+        if goal_pose == [2, 2]:
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+            marker.color.a = 1.0
+        else:
+            marker.color.r = 0.0
+            marker.color.g = 0.0
+            marker.color.b = 1.0
+            marker.color.a = 1.0
+
+        # Set the pose of the marker
+        marker.pose.position.x = goal_pose[0] + robot_pose[0]
+        marker.pose.position.y = -(goal_pose[1]) + robot_pose[1]
+        marker.pose.position.z = 0
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+
+    return marker
