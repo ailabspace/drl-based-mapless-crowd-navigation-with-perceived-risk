@@ -122,7 +122,7 @@ self.k_obstacle_count = 8  #K = 8 implementation
 
 ## BibTeX Citation
 
-If you have used this repository in any of your scientific work, please consider citing my work (submitted to IROS2023):
+If you have used this repository in any of your scientific work, please consider citing my work (submitted to ICRA2024):
 
 ```
 @misc{anas2023deep,
