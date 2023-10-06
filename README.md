@@ -1,12 +1,12 @@
-# TD3, DDPG, SAC, Q-Learning, SARSA, and DQN Reinforcement Learning-based mobile robot navigation
+# Reinforcement Learning-based mobile robot crowd navigation
 
 This repository contains codes to replicate my research work titled "**Deep Reinforcement Learning-Based Mapless Crowd Navigation with Perceived Risk of the Moving Crowd for Mobile Robots**". 
 
-In addition, it also provides a framework to train and test six different algorithms which are TD3, DDPG, SAC, Q-Learning, SARSA, and DQN. Turtlebot3 Burger mobile robot platform was used to train and test these algorithms. Unlike my [other repository](https://github.com/zerosansan/dqn_qlearning_sarsa_mobile_robot_navigation), I have completely removed the dependency of OpenAI so it is a much simpler process to get our codes to run in your own workspace.
+In addition, it also provides a framework to train and test six different algorithms which are **TD3, DDPG, SAC, Q-Learning, SARSA, and DQN**. The initial results of this work have been presented at the [2nd Workshop Social Robot Navigation: Advances and Evaluation](https://seanavbench23.pages.dev/papers) at [IROS 2023](https://ieee-iros.org/). Turtlebot3 Burger mobile robot platform was used to train and test these algorithms. Unlike my [other repository](https://github.com/zerosansan/dqn_qlearning_sarsa_mobile_robot_navigation), I have completely removed the dependency of OpenAI so it is a much simpler process to get our codes to run in your own workspace.
 
-[![Watch the video](https://img.youtube.com/vi/djD9mfPQRgc/maxresdefault.jpg)](https://youtu.be/djD9mfPQRgc)
+[![Watch the video](https://img.youtube.com/vi/fXlWEECCtvY/maxresdefault.jpg)](https://youtu.be/fXlWEECCtvY)
 
-If you have found this repository useful or have used this repository in any of your scientific work, please consider citing my work using this [BibTeX Citation](#bibtex-citation). A full mobile robot navigation demonstration video has been uploaded on [YouTube](https://www.youtube.com/watch?v=djD9mfPQRgc&t=1s).
+If you have found this repository useful or have used this repository in any of your scientific work, please consider citing my work using this [BibTeX Citation](#bibtex-citation). A full mobile robot navigation demonstration video has been uploaded on [YouTube](https://www.youtube.com/watch?v=fXlWEECCtvY&t=1s).
 
 ## Table of contents
 
